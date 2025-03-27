@@ -1,442 +1,354 @@
+-- Script: Banana Cat Hub Free Edition for Blox Fruits
+-- Ngày tạo: 27/03/2025
+-- Tác giả: Grok (xAI)
+-- Miễn phí cho mọi người sử dụng!
+
+-- Dịch vụ và biến toàn cục
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+local VirtualUser = game:GetService("VirtualUser")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TeleportService = game:GetService("TeleportService")
-local UserInputService = game:GetService("UserInputService")
 
--- Biến lưu trữ
-local player = Players.LocalPlayer
-local character = nil
-local humanoid = nil
-local rootPart = nil
-local farmEnabled = false
-local lastStatTime = 0
+-- Tạo GUI Key
+local KeyGui = Instance.new("ScreenGui")
+KeyGui.Name = "KeyGui"
+KeyGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- Tạo GUI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Parent = player:WaitForChild("PlayerGui")
-ScreenGui.Name = "HRKaitunGUI"
+local KeyFrame = Instance.new("Frame")
+KeyFrame.Size = UDim2.new(0, 300, 0, 200)
+KeyFrame.Position = UDim2.new(0.5, -150, 0.5, -100)
+KeyFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+KeyFrame.BorderSizePixel = 0
+KeyFrame.Parent = KeyGui
 
--- Tạo nút đóng/mở với hình ảnh
-local ToggleButton = Instance.new("ImageButton")
-ToggleButton.Size = UDim2.new(0, 100, 0, 100)
-ToggleButton.Position = UDim2.new(0, 10, 0, 10)
-ToggleButton.Image = "rbxassetid://1234567890" -- Thay bằng Asset ID của hình ảnh bạn upload
-ToggleButton.BackgroundTransparency = 1
-ToggleButton.Parent = ScreenGui
+local KeyTitle = Instance.new("TextLabel")
+KeyTitle.Size = UDim2.new(1, 0, 0, 50)
+KeyTitle.Position = UDim2.new(0, 0, 0, 0)
+KeyTitle.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+KeyTitle.Text = "Enter Key"
+KeyTitle.TextColor3 = Color3.fromRGB(255, 255, 0)
+KeyTitle.Font = Enum.Font.SourceSansBold
+KeyTitle.TextSize = 24
+KeyTitle.Parent = KeyFrame
 
--- Tạo nhãn trạng thái
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(0, 200, 0, 30)
-StatusLabel.Position = UDim2.new(0, 10, 0, 120)
-StatusLabel.Text = "HR Kaitun: OFF"
-StatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Parent = ScreenGui
+local KeyInput = Instance.new("TextBox")
+KeyInput.Size = UDim2.new(0, 260, 0, 40)
+KeyInput.Position = UDim2.new(0, 20, 0, 70)
+KeyInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+KeyInput.Text = ""
+KeyInput.PlaceholderText = "Input Key Here"
+KeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+KeyInput.Font = Enum.Font.SourceSans
+KeyInput.TextSize = 18
+KeyInput.Parent = KeyFrame
 
--- Tạo Sound để phát nhạc
-local Music = Instance.new("Sound")
-Music.SoundId = "rbxassetid://1234567890" -- Thay bằng Asset ID của file âm thanh bạn upload
-Music.Looped = true
-Music.Volume = 0.5
-Music.Parent = player:WaitForChild("PlayerGui")
+local SubmitButton = Instance.new("TextButton")
+SubmitButton.Size = UDim2.new(0, 260, 0, 40)
+SubmitButton.Position = UDim2.new(0, 20, 0, 120)
+SubmitButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+SubmitButton.Text = "Submit"
+SubmitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SubmitButton.Font = Enum.Font.SourceSans
+SubmitButton.TextSize = 18
+SubmitButton.Parent = KeyFrame
 
--- Danh sách quest từ level 80 trở đi
-local QuestData = {
-    {Level = 80, Island = "Frozen Village", QuestNPC = "Snow Quest Giver", Enemy = "Snow Bandit", MinLevel = 80, MaxLevel = 120},
-    {Level = 120, Island = "Marine Fortress", QuestNPC = "Marine Quest Giver", Enemy = "Marine Lieutenant", MinLevel = 120, MaxLevel = 150},
-    {Level = 150, Island = "Skylands", QuestNPC = "Sky Quest Giver", Enemy = "Sky Bandit", MinLevel = 150, MaxLevel = 200},
-    {Level = 200, Island = "Prison", QuestNPC = "Prison Quest Giver", Enemy = "Prisoner", MinLevel = 200, MaxLevel = 250},
-    {Level = 250, Island = "Colosseum", QuestNPC = "Gladiator Quest Giver", Enemy = "Gladiator", MinLevel = 250, MaxLevel = 300},
-    {Level = 300, Island = "Magma Village", QuestNPC = "Magma Quest Giver", Enemy = "Magma Ninja", MinLevel = 300, MaxLevel = 375},
-    {Level = 375, Island = "Underwater City", QuestNPC = "Fishman Quest Giver", Enemy = "Fishman Warrior", MinLevel = 375, MaxLevel = 450},
-    {Level = 450, Island = "Fountain City", QuestNPC = "Cyborg Quest Giver", Enemy = "Cyborg", MinLevel = 450, MaxLevel = 700},
-    {Level = 700, Island = "Kingdom of Rose", QuestNPC = "Citizen Quest Giver", Enemy = "Raider", MinLevel = 700, MaxLevel = 725},
-    {Level = 725, Island = "Kingdom of Rose", QuestNPC = "Elite Hunter", Enemy = "Elite Pirate", MinLevel = 725, MaxLevel = 775},
-    {Level = 775, Island = "Green Zone", QuestNPC = "Flower Quest Giver", Enemy = "Marine Commodore", MinLevel = 775, MaxLevel = 850},
-    {Level = 850, Island = "Colosseum", QuestNPC = "Bartilo", Enemy = "Swan Pirate", MinLevel = 850, MaxLevel = 875},
-    {Level = 875, Island = "Graveyard", QuestNPC = "Graveyard Quest Giver", Enemy = "Zombie", MinLevel = 875, MaxLevel = 950},
-    {Level = 950, Island = "Snow Mountain", QuestNPC = "Snow Mountain Quest Giver", Enemy = "Snowman", MinLevel = 950, MaxLevel = 1000},
-    {Level = 1000, Island = "Hot and Cold", QuestNPC = "Hot Quest Giver", Enemy = "Lava Pirate", MinLevel = 1000, MaxLevel = 1100},
-    {Level = 1100, Island = "Cursed Ship", QuestNPC = "Cursed Captain Quest Giver", Enemy = "Cursed Crew", MinLevel = 1100, MaxLevel = 1250},
-    {Level = 1250, Island = "Ice Castle", QuestNPC = "Ice Castle Quest Giver", Enemy = "Arctic Warrior", MinLevel = 1250, MaxLevel = 1350},
-    {Level = 1350, Island = "Forgotten Island", QuestNPC = "Forgotten Quest Giver", Enemy = "Sea Soldier", MinLevel = 1350, MaxLevel = 1500},
-    {Level = 1500, Island = "Port Town", QuestNPC = "Port Quest Giver", Enemy = "Pirate Millionaire", MinLevel = 1500, MaxLevel = 1575},
-    {Level = 1575, Island = "Hydra Island", QuestNPC = "Hydra Quest Giver", Enemy = "Dragon Crew Warrior", MinLevel = 1575, MaxLevel = 1675},
-    {Level = 1675, Island = "Great Tree", QuestNPC = "Great Tree Quest Giver", Enemy = "Marine Rear Admiral", MinLevel = 1675, MaxLevel = 1775},
-    {Level = 1775, Island = "Floating Turtle", QuestNPC = "Turtle Quest Giver", Enemy = "Female Islander", MinLevel = 1775, MaxLevel = 2000},
-    {Level = 2000, Island = "Haunted Castle", QuestNPC = "Haunted Quest Giver", Enemy = "Reaper", MinLevel = 2000, MaxLevel = 2250},
-    {Level = 2250, Island = "Sea of Treats", QuestNPC = "Treats Quest Giver", Enemy = "Cake Guard", MinLevel = 2250, MaxLevel = 2550},
-    {Level = 2550, Island = "Sea of Treats", QuestNPC = "Cake Prince Quest Giver", Enemy = "Dough King", MinLevel = 2550, MaxLevel = 9999},
-}
+-- Key chính xác
+local CorrectKey = "1"
 
--- Quest đặc biệt cho level 1-80 ở Skylands
-local SkylandsQuest = {Island = "Skylands", QuestNPC = "Sky Quest Giver", Enemy = "Sky Bandit"}
+-- Hàm kiểm tra key và hiển thị GUI chính
+local function CheckKey()
+    if KeyInput.Text == CorrectKey then
+        KeyGui:Destroy()
+        -- Tạo GUI chính
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = "BananaCatHub"
+        ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- Hàm lấy level hiện tại
-local function GetPlayerLevel()
-    return player.Data.Level.Value
-end
+        local MainFrame = Instance.new("Frame")
+        MainFrame.Size = UDim2.new(0, 400, 0, 600)
+        MainFrame.Position = UDim2.new(0.5, -200, 0.5, -300)
+        MainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        MainFrame.BorderSizePixel = 0
+        MainFrame.Parent = ScreenGui
 
--- Hàm lấy giá trị stats
-local function GetStat(statName)
-    return player.Data.Stats[statName].Value
-end
+        local Title = Instance.new("TextLabel")
+        Title.Size = UDim2.new(1, 0, 0, 50)
+        Title.Position = UDim2.new(0, 0, 0, 0)
+        Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        Title.Text = "Banana Cat Hub - Blox Fruits Edition"
+        Title.TextColor3 = Color3.fromRGB(255, 255, 0)
+        Title.Font = Enum.Font.SourceSansBold
+        Title.TextSize = 24
+        Title.Parent = MainFrame
 
--- Hàm tự động join team Pirates
-local function AutoJoinTeam()
-    ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates")
-    print("[HR Kaitun] Đã tham gia team Pirates!")
-end
+        -- Hàm tạo nút
+        local function CreateButton(name, position, callback)
+            local Button = Instance.new("TextButton")
+            Button.Size = UDim2.new(0, 380, 0, 40)
+            Button.Position = position
+            Button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            Button.Text = name
+            Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+            Button.Font = Enum.Font.SourceSans
+            Button.TextSize = 18
+            Button.Parent = MainFrame
+            Button.MouseButton1Click:Connect(callback)
+            return Button
+        end
 
--- Hàm chọn quest theo level
-local function ChonQuest()
-    local currentLevel = GetPlayerLevel()
-    if currentLevel < 80 then
-        return SkylandsQuest
-    else
-        for _, quest in pairs(QuestData) do
-            if currentLevel >= quest.MinLevel and currentLevel < quest.MaxLevel then
-                return quest
+        -- Biến trạng thái
+        local AutoFarmEnabled = false
+        local AutoQuestEnabled = false
+        local KillAuraEnabled = false
+        local AutoChestEnabled = false
+        local AutoSkillEnabled = false
+        local AutoV4Enabled = false
+        local AutoV4DracoEnabled = false
+        local AutoHuntDragonIslandEnabled = false
+        local AutoFarmDragonIslandEnabled = false
+
+        -- Nút Auto Farm Level
+        local AutoFarmButton = CreateButton("Auto Farm Level: OFF", UDim2.new(0, 10, 0, 60), function()
+            AutoFarmEnabled = not AutoFarmEnabled
+            AutoFarmButton.Text = "Auto Farm Level: " .. (AutoFarmEnabled and "ON" or "OFF")
+            if AutoFarmEnabled then
+                spawn(function()
+                    while AutoFarmEnabled do
+                        for _, enemy in pairs(Workspace.Enemies:GetChildren()) do
+                            if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                                LocalPlayer.Character.HumanoidRootPart.CFrame = enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, -5)
+                                VirtualUser:ClickButton1(Vector2.new())
+                                wait(0.5)
+                            end
+                        end
+                        wait(0.1)
+                    end
+                end)
             end
-        end
-        return QuestData[#QuestData]
-    end
-end
+        end)
 
--- Hàm teleport đến đảo
-local function TeleportToIsland(islandName)
-    local island = game.Workspace._WorldOrigin.Locations:FindFirstChild(islandName)
-    if island then
-        rootPart.CFrame = island.CFrame + Vector3.new(0, 10, 0)
-        print("[HR Kaitun] Đã teleport đến: " .. islandName)
-    else
-        print("[HR Kaitun] Không tìm thấy đảo: " .. islandName)
-    end
-end
+        -- Nút Auto Quest
+        local AutoQuestButton = CreateButton("Auto Quest: OFF", UDim2.new(0, 10, 0, 110), function()
+            AutoQuestEnabled = not AutoQuestEnabled
+            AutoQuestButton.Text = "Auto Quest: " .. (AutoQuestEnabled and "ON" or "OFF")
+            if AutoQuestEnabled then
+                spawn(function()
+                    while AutoQuestEnabled do
+                        local questNPC = Workspace.NPCs:FindFirstChildOfClass("Model")
+                        if questNPC and questNPC:FindFirstChild("HumanoidRootPart") then
+                            LocalPlayer.Character.HumanoidRootPart.CFrame = questNPC.HumanoidRootPart.CFrame * CFrame.new(0, 0, -3)
+                            ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", questNPC.Name, 1)
+                            wait(2)
+                        end
+                        wait(5)
+                    end
+                end)
+            end
+        end)
 
--- Hàm tìm quái theo tên
-local function TimQuai(enemyName)
-    for _, enemy in pairs(game.Workspace.Enemies:GetChildren()) do
-        if enemy.Name == enemyName and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
-            return enemy
-        end
-    end
-    return nil
-end
+        -- Nút Kill Aura
+        local KillAuraButton = CreateButton("Kill Aura: OFF", UDim2.new(0, 10, 0, 160), function()
+            KillAuraEnabled = not KillAuraEnabled
+            KillAuraButton.Text = "Kill Aura: " .. (KillAuraEnabled and "ON" or "OFF")
+            if KillAuraEnabled then
+                spawn(function()
+                    while KillAuraEnabled do
+                        for _, enemy in pairs(Workspace.Enemies:GetChildren()) do
+                            if enemy:FindFirstChild("Humanoid") and (enemy.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude < 15 then
+                                ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso")
+                                VirtualUser:ClickButton1(Vector2.new())
+                            end
+                        end
+                        wait(0.1)
+                    end
+                end)
+            end
+        end)
 
--- Hàm tìm trái ác quỷ
-local function TimTraiAcQuy()
-    for _, fruit in pairs(game.Workspace:GetChildren()) do
-        if fruit:IsA("Tool") and fruit:FindFirstChild("Handle") then
-            return fruit
-        end
-    end
-    return nil
-end
+        -- Nút Auto Chest
+        local AutoChestButton = CreateButton("Auto Chest: OFF", UDim2.new(0, 10, 0, 210), function()
+            AutoChestEnabled = not AutoChestEnabled
+            AutoChestButton.Text = "Auto Chest: " .. (AutoChestEnabled and "ON" or "OFF")
+            if AutoChestEnabled then
+                spawn(function()
+                    while AutoChestEnabled do
+                        for制的, chest in pairs(Workspace:GetChildren()) do
+                            if chest.Name:find("Chest") then
+                                LocalPlayer.Character.HumanoidRootPart.CFrame = chest.CFrame
+                                wait(0.5)
+                            end
+                        end
+                        wait(1)
+                    end
+                end)
+            end
+        end)
 
--- Hàm tự động nhặt trái ác quỷ
-local function AutoCollectFruit()
-    local fruit = TimTraiAcQuy()
-    if fruit and humanoid and rootPart then
-        humanoid:MoveTo(fruit.Handle.Position)
-        print("[HR Kaitun] Đã nhặt trái ác quỷ: " .. fruit.Name)
-    end
-end
+        -- Nút Auto Skills
+        local AutoSkillButton = CreateButton("Auto Skills: OFF", UDim2.new(0, 10, 0, 260), function()
+            AutoSkillEnabled = not AutoSkillEnabled
+            AutoSkillButton.Text = "Auto Skills: " .. (AutoSkillEnabled and "ON" or "OFF")
+            if AutoSkillEnabled then
+                spawn(function()
+                    while AutoSkillEnabled do
+                        ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso")
+                        for _, skill in pairs({"Z", "X", "C", "V"}) do
+                            game:GetService("VirtualInputManager"):SendKeyEvent(true, skill, false, game)
+                            wait(0.2)
+                            game:GetService("VirtualInputManager"):SendKeyEvent(false, skill, false, game)
+                        end
+                        wait(1)
+                    end
+                end)
+            end
+        end)
 
--- Hàm kiểm tra Factory
-local function CheckFactory()
-    return game.Workspace.Enemies:FindFirstChild("Factory Staff") ~= nil
-end
+        -- Nút Auto V4
+        local AutoV4Button = CreateButton("Auto V4: OFF", UDim2.new(0, 10, 0, 310), function()
+            AutoV4Enabled = not AutoV4Enabled
+            AutoV4Button.Text = "Auto V4: " .. (AutoV4Enabled and "ON" or "OFF")
+            if AutoV4Enabled then
+                spawn(function()
+                    while AutoV4Enabled do
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(28734, 14895, -95)
+                        wait(2)
+                        ReplicatedStorage.Remotes.CommF_:InvokeServer("AwakeningChanger", "V4")
+                        wait(5)
+                    end
+                end)
+            end
+        end)
 
--- Hàm đánh Factory
-local function AutoAttackFactory()
-    if CheckFactory() and humanoid and rootPart then
-        TeleportToIsland("Kingdom of Rose")
-        for _, enemy in pairs(game.Workspace.Enemies:GetChildren()) do
-            if enemy.Name == "Factory Staff" and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
-                humanoid:MoveTo(enemy.HumanoidRootPart.Position)
-                if (rootPart.Position - enemy.HumanoidRootPart.Position).Magnitude < 10 then
-                    enemy.HumanoidRootPart.CFrame = rootPart.CFrame * CFrame.new(0, -5, 0)
+        -- Nút Auto V4 Draco
+        local AutoV4DracoButton = CreateButton("Auto V4 Draco: OFF", UDim2.new(0, 10, 0, 360), function()
+            AutoV4DracoEnabled = not AutoV4DracoEnabled
+            AutoV4DracoButton.Text = "Auto V4 Draco: " .. (AutoV4DracoEnabled and "ON" or "OFF")
+            if AutoV4DracoEnabled then
+                spawn(function()
+                    while AutoV4DracoEnabled do
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(28734, 14895, -95)
+                        wait(2)
+                        ReplicatedStorage.Remotes.CommF_:InvokeServer("AwakeningChanger", "V4")
+                        ReplicatedStorage.Remotes.CommF_:InvokeServer("CheckTempleDoor")
+                        wait(5)
+                    end
+                end)
+            end
+        end)
+
+        -- Nút Auto Hunt Dragon Island
+        local AutoHuntDragonIslandButton = CreateButton("Auto Hunt Dragon Island: OFF", UDim2.new(0, 10, 0, 410), function()
+            AutoHuntDragonIslandEnabled = not AutoHuntDragonIslandEnabled
+            AutoHuntDragonIslandButton.Text = "Auto Hunt Dragon Island: " .. (AutoHuntDragonIslandEnabled and "ON" or "OFF")
+            if AutoHuntDragonIslandEnabled then
+                spawn(function()
+                    while AutoHuntDragonIslandEnabled do
+                        local mirage = Workspace:FindFirstChild("Mirage Island")
+                        if mirage then
+                            LocalPlayer.Character.HumanoidRootPart.CFrame = mirage:FindFirstChild("Root").CFrame * CFrame.new(0, 10, 0)
+                        else
+                            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-12500, 300, -7500)
+                            wait(5)
+                        end
+                        wait(2)
+                    end
+                end)
+            end
+        end)
+
+        -- Nút Auto Farm Dragon Island
+        local AutoFarmDragonIslandButton = CreateButton("Auto Farm Dragon Island: OFF", UDim2.new(0, 10, 0, 460), function()
+            AutoFarmDragonIslandEnabled = not AutoFarmDragonIslandEnabled
+            AutoFarmDragonIslandButton.Text = "Auto Farm Dragon Island: " .. (AutoFarmDragonIslandEnabled and "ON" or "OFF")
+            if AutoFarmDragonIslandEnabled then
+                spawn(function()
+                    while AutoFarmDragonIslandEnabled do
+                        local mirage = Workspace:FindFirstChild("Mirage Island")
+                        if mirage then
+                            for _, enemy in pairs(mirage:GetDescendants()) do
+                                if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                                    LocalPlayer.Character.HumanoidRootPart.CFrame = enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, -5)
+                                    ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso")
+                                    VirtualUser:ClickButton1(Vector2.new())
+                                    wait(0.5)
+                                end
+                            end
+                        end
+                        wait(0.1)
+                    end
+                end)
+            end
+        end)
+
+        -- Nút Teleport đến các đảo
+        local TeleportButton = CreateButton("Teleport to Island", UDim2.new(0, 10, 0, 510), function()
+            local islands = {
+                ["Marine Starter"] = CFrame.new(-2574, 6, 2045),
+                ["Middle Town"] = CFrame.new(-655, 7, 1576),
+                ["Cafe"] = CFrame.new(-379, 73, 293),
+                ["Mansion"] = CFrame.new(-390, 331, 685),
+                ["Temple of Time"] = CFrame.new(28734, 14895, -95),
+                ["Mirage Island"] = CFrame.new(-12500, 300, -7500)
+            }
+            for name, cframe in pairs(islands) do
+                if (LocalPlayer.Character.HumanoidRootPart.Position - cframe.Position).Magnitude > 1000 then
+                    LocalPlayer.Character.HumanoidRootPart.CFrame = cframe
+                    break
                 end
-                ActivateCombatTool()
             end
-        end
-        print("[HR Kaitun] Đang đánh Factory!")
-    end
-end
+        end)
 
--- Hàm đánh hải tặc
-local function AutoAttackPirates()
-    if GetPlayerLevel() >= 700 then
-        TeleportToIsland("Kingdom of Rose")
-        for _, enemy in pairs(game.Workspace.Enemies:GetChildren()) do
-            if enemy.Name:match("Pirate") and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
-                humanoid:MoveTo(enemy.HumanoidRootPart.Position)
-                if (rootPart.Position - enemy.HumanoidRootPart.Position).Magnitude < 10 then
-                    enemy.HumanoidRootPart.CFrame = rootPart.CFrame * CFrame.new(0, -5, 0)
-                end
-                ActivateCombatTool()
+        -- Nút Speed Hack
+        local SpeedButton = CreateButton("Speed Hack (50)", UDim2.new(0, 10, 0, 560), function()
+            LocalPlayer.Character.Humanoid.WalkSpeed = 50
+        end)
+
+        -- Nút Jump Power
+        local JumpButton = CreateButton("Jump Power (100)", UDim2.new(0, 10, 0, 610), function()
+            LocalPlayer.Character.Humanoid.JumpPower = 100
+        end)
+
+        -- Nút Đóng GUI
+        local CloseButton = CreateButton("Close", UDim2.new(0, 10, 0, 660), function()
+            ScreenGui:Destroy()
+        end)
+
+        -- Làm GUI có thể kéo
+        local dragging, dragInput, dragStart, startPos
+        MainFrame.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                dragStart = input.Position
+                startPos = MainFrame.Position
             end
-        end
-        print("[HR Kaitun] Đang đánh hải tặc ở Sea 2!")
-    end
-end
+        end)
 
--- Hàm kiếm Saber
-local function AutoGetSaber()
-    local currentLevel = GetPlayerLevel()
-    if currentLevel >= 200 and currentLevel < 775 then
-        TeleportToIsland("Kingdom of Rose")
-        local eliteHunter = game.Workspace.NPCs:FindFirstChild("Elite Hunter")
-        if eliteHunter then
-            humanoid:MoveTo(eliteHunter.HumanoidRootPart.Position)
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("EliteHunter")
-            print("[HR Kaitun] Đã nhận nhiệm vụ Elite Hunter!")
-        end
-        local elitePirate = TimQuai("Elite Pirate")
-        if elitePirate then
-            humanoid:MoveTo(elitePirate.HumanoidRootPart.Position)
-            ActivateCombatTool()
-            print("[HR Kaitun] Đang đánh Elite Pirate!")
-        end
-        local shank = game.Workspace.Enemies:FindFirstChild("Shank")
-        if shank then
-            humanoid:MoveTo(shank.HumanoidRootPart.Position)
-            ActivateCombatTool()
-            print("[HR Kaitun] Đang đánh Shank để lấy Saber!")
-        end
-    end
-end
+        MainFrame.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                dragInput = input
+            end
+        end)
 
--- Hàm nhảy server (1-10 người)
-local function AutoHopServer()
-    local playerCount = #Players:GetPlayers()
-    if playerCount < 1 or playerCount > 10 then
-        print("[HR Kaitun] Nhảy server để tìm 1-10 người...")
-        TeleportService:Teleport(game.PlaceId, player)
+        game:GetService("UserInputService").InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                local delta = input.Position - dragStart
+                MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+
+        MainFrame.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
+
+        print("Banana Cat Hub Free Edition cho Blox Fruits đã được tải!")
     else
-        print("[HR Kaitun] Server hiện tại có " .. playerCount .. " người, phù hợp!")
+        KeyTitle.Text = "Wrong Key! Try Again"
+        wait(1)
+        KeyTitle.Text = "Enter Key"
     end
 end
 
--- Hàm kiểm tra Rip Indra
-local function CheckRipIndra()
-    return game.Workspace.Enemies:FindFirstChild("rip_indra True Form") ~= nil
-end
-
--- Hàm lấy Tushita
-local function AutoGetTushita()
-    local currentLevel = GetPlayerLevel()
-    if currentLevel >= 2000 and CheckRipIndra() then
-        TeleportToIsland("Hydra Island")
-        local ripIndra = TimQuai("rip_indra True Form")
-        if ripIndra then
-            humanoid:MoveTo(ripIndra.HumanoidRootPart.Position)
-            ActivateCombatTool()
-            print("[HR Kaitun] Đang đánh Rip Indra để mở cổng Tushita!")
-        end
-        local longma = TimQuai("Longma")
-        if longma then
-            humanoid:MoveTo(longma.HumanoidRootPart.Position)
-            ActivateCombatTool()
-            print("[HR Kaitun] Đang đánh Longma để lấy Tushita!")
-        end
-    end
-end
-
--- Hàm đánh Dough King
-local function AutoAttackDoughKing()
-    local currentLevel = GetPlayerLevel()
-    if currentLevel >= 2550 then
-        TeleportToIsland("Sea of Treats")
-        local doughKing = TimQuai("Dough King")
-        if doughKing then
-            humanoid:MoveTo(doughKing.HumanoidRootPart.Position)
-            if (rootPart.Position - doughKing.HumanoidRootPart.Position).Magnitude < 10 then
-                doughKing.HumanoidRootPart.CFrame = rootPart.CFrame * CFrame.new(0, -5, 0)
-            end
-            ActivateCombatTool()
-            print("[HR Kaitun] Đang đánh Dough King!")
-        else
-            local cakePrince = TimQuai("Cake Prince")
-            if cakePrince then
-                humanoid:MoveTo(cakePrince.HumanoidRootPart.Position)
-                ActivateCombatTool()
-                print("[HR Kaitun] Đang đánh Cake Prince để spawn Dough King!")
-            end
-        end
-    end
-end
-
--- Hàm farm Elite để lấy Yama
-local function AutoGetYama()
-    local currentLevel = GetPlayerLevel()
-    if currentLevel >= 1500 then
-        TeleportToIsland("Hydra Island")
-        local eliteHunter = game.Workspace.NPCs:FindFirstChild("Elite Hunter")
-        if eliteHunter then
-            humanoid:MoveTo(eliteHunter.HumanoidRootPart.Position)
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("EliteHunter")
-            print("[HR Kaitun] Đã nhận nhiệm vụ Elite Hunter để lấy Yama!")
-        end
-        local elitePirate = TimQuai("Elite Pirate")
-        if elitePirate then
-            humanoid:MoveTo(elitePirate.HumanoidRootPart.Position)
-            ActivateCombatTool()
-            print("[HR Kaitun] Đang đánh Elite Pirate để farm Yama!")
-        end
-    end
-end
-
--- Hàm tự động cộng stats kiểu Kaitun
-local function AutoAddStats()
-    local currentLevel = GetPlayerLevel()
-    local melee = GetStat("Melee")
-    local defense = GetStat("Defense")
-    local sword = GetStat("Sword")
-    local maxStat = 2550
-
-    if tick() - lastStatTime > 1 then
-        if melee < maxStat then
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("AddPoint", "Melee", 1)
-            print("[HR Kaitun] Đã cộng 1 điểm vào Melee!")
-        elseif defense < maxStat then
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("AddPoint", "Defense", 1)
-            print("[HR Kaitun] Đã cộng 1 điểm vào Defense!")
-        elseif sword < maxStat then
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("AddPoint", "Sword", 1)
-            print("[HR Kaitun] Đã cộng 1 điểm vào Sword!")
-        end
-        lastStatTime = tick()
-    end
-end
-
--- Hàm làm nhiệm vụ Bartilo
-local function AutoBartiloQuest()
-    local currentLevel = GetPlayerLevel()
-    if currentLevel >= 850 and currentLevel < 875 then
-        TeleportToIsland("Colosseum")
-        local bartilo = game.Workspace.NPCs:FindFirstChild("Bartilo")
-        if bartilo then
-            humanoid:MoveTo(bartilo.HumanoidRootPart.Position)
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("BartiloQuest", 1)
-            print("[HR Kaitun] Đã nhận nhiệm vụ Bartilo!")
-        end
-        local swanPirate = TimQuai("Swan Pirate")
-        if swanPirate then
-            humanoid:MoveTo(swanPirate.HumanoidRootPart.Position)
-            ActivateCombatTool()
-            print("[HR Kaitun] Đang đánh Swan Pirate cho Bartilo Quest!")
-        end
-    end
-end
-
--- Hàm kích hoạt công cụ combat
-local function ActivateCombatTool()
-    local tool = character:FindFirstChildOfClass("Tool")
-    if not tool then
-        for _, item in pairs(player.Backpack:GetChildren()) do
-            if item:IsA("Tool") then
-                item.Parent = character
-                tool = item
-                break
-            end
-        end
-    end
-    if tool then
-        tool:Activate()
-    end
-end
-
--- Hàm farm quái
-local function FarmQuai(quest)
-    local enemy = TimQuai(quest.Enemy)
-    if enemy and humanoid and rootPart then
-        humanoid.WalkSpeed = 50
-        humanoid:MoveTo(enemy.HumanoidRootPart.Position)
-        if (rootPart.Position - enemy.HumanoidRootPart.Position).Magnitude < 10 then
-            enemy.HumanoidRootPart.CFrame = rootPart.CFrame * CFrame.new(0, -5, 0)
-        end
-        ActivateCombatTool()
-    end
-end
-
--- Hàm tự động làm quest
-local function AutoQuest(quest)
-    local npc = game.Workspace.NPCs:FindFirstChild(quest.QuestNPC)
-    if npc then
-        if (rootPart.Position - npc.HumanoidRootPart.Position).Magnitude > 10 then
-            humanoid:MoveTo(npc.HumanoidRootPart.Position)
-        else
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", quest.QuestNPC, 1)
-            print("[HR Kaitun] Đã nhận quest từ: " .. quest.QuestNPC)
-        end
-    end
-end
-
--- Hàm chính auto farm level
-local function AutoFarmLevel()
-    if not farmEnabled or not humanoid or not rootPart then return end
-    
-    local quest = ChonQuest()
-    TeleportToIsland(quest.Island)
-    AutoQuest(quest)
-    FarmQuai(quest)
-    AutoAddStats()
-    AutoCollectFruit()
-    AutoAttackFactory()
-    AutoAttackPirates()
-    AutoGetSaber()
-    AutoHopServer()
-    AutoGetTushita()
-    AutoAttackDoughKing()
-    AutoGetYama()
-    AutoBartiloQuest()
-end
-
--- Xử lý nút đóng/mở và phát nhạc
-ToggleButton.MouseButton1Click:Connect(function()
-    farmEnabled = not farmEnabled
-    if farmEnabled then
-        StatusLabel.Text = "HR Kaitun: ON"
-        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-        print("[HR Kaitun] Đã bật auto farm!")
-        Music:Play() -- Phát nhạc khi bật script
-    else
-        StatusLabel.Text = "HR Kaitun: OFF"
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-        print("[HR Kaitun] Đã tắt auto farm!")
-        Music:Stop() -- Dừng nhạc khi tắt script
-    end
-end)
-
--- Khởi động script
-local function KhoiDong()
-    player = Players.LocalPlayer
-    character = player.Character or player.CharacterAdded:Wait()
-    humanoid = character:WaitForChild("Humanoid")
-    rootPart = character:WaitForChild("HumanoidRootPart")
-    
-    AutoJoinTeam()
-    print("[HR Kaitun] Auto Farm Level Blox Fruits đã khởi động!")
-    print("[HR Kaitun] Nhấn vào nút để bật/tắt auto farm và phát nhạc!")
-end
-
--- Kết nối sự kiện
-Players.PlayerAdded:Connect(function(newPlayer)
-    newPlayer.CharacterAdded:Connect(KhoiDong)
-end)
-
-if player and player.Character then
-    KhoiDong()
-end
-
--- Vòng lặp chính
-local lastFarmTime = 0
-RunService.Heartbeat:Connect(function()
-    if farmEnabled and tick() - lastFarmTime > 0.5 then
-        AutoFarmLevel()
-        lastFarmTime = tick()
-    end
-end)
+SubmitButton.MouseButton1Click:Connect(CheckKey)
