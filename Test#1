@@ -1,6 +1,8 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local VirtualUser = game:GetService("VirtualUser")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService = game:GetService("TeleportService")
+local UserInputService = game:GetService("UserInputService")
 
 -- Biến lưu trữ
 local player = Players.LocalPlayer
@@ -8,56 +10,108 @@ local character = nil
 local humanoid = nil
 local rootPart = nil
 local farmEnabled = false
+local lastStatTime = 0
 
--- Danh sách đảo và quest theo level
+-- Tạo GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+ScreenGui.Name = "HRKaitunGUI"
+
+-- Tạo nút đóng/mở với hình ảnh
+local ToggleButton = Instance.new("ImageButton")
+ToggleButton.Size = UDim2.new(0, 100, 0, 100)
+ToggleButton.Position = UDim2.new(0, 10, 0, 10)
+ToggleButton.Image = "rbxassetid://1234567890" -- Thay bằng Asset ID của hình ảnh bạn upload
+ToggleButton.BackgroundTransparency = 1
+ToggleButton.Parent = ScreenGui
+
+-- Tạo nhãn trạng thái
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(0, 200, 0, 30)
+StatusLabel.Position = UDim2.new(0, 10, 0, 120)
+StatusLabel.Text = "HR Kaitun: OFF"
+StatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Parent = ScreenGui
+
+-- Tạo Sound để phát nhạc
+local Music = Instance.new("Sound")
+Music.SoundId = "rbxassetid://1234567890" -- Thay bằng Asset ID của file âm thanh bạn upload
+Music.Looped = true
+Music.Volume = 0.5
+Music.Parent = player:WaitForChild("PlayerGui")
+
+-- Danh sách quest từ level 80 trở đi
 local QuestData = {
-    {Level = 0, Island = "First Sea", QuestNPC = "Bandit Quest Giver", Enemy = "Bandit", MinLevel = 0, MaxLevel = 10},
-    {Level = 10, Island = "Jungle", QuestNPC = "Monkey Quest Giver", Enemy = "Monkey", MinLevel = 10, MaxLevel = 30},
-    {Level = 30, Island = "Pirate Village", QuestNPC = "Pirate Quest Giver", Enemy = "Pirate", MinLevel = 30, MaxLevel = 60},
-    {Level = 60, Island = "Desert", QuestNPC = "Desert Bandit Quest Giver", Enemy = "Desert Bandit", MinLevel = 60, MaxLevel = 90},
-    {Level = 90, Island = "Frozen Village", QuestNPC = "Snow Quest Giver", Enemy = "Snow Bandit", MinLevel = 90, MaxLevel = 120},
-    {Level = 120, Island = "Marine Fortress", QuestNPC = "Marine Quest Giver", Enemy = "Marine", MinLevel = 120, MaxLevel = 150},
+    {Level = 80, Island = "Frozen Village", QuestNPC = "Snow Quest Giver", Enemy = "Snow Bandit", MinLevel = 80, MaxLevel = 120},
+    {Level = 120, Island = "Marine Fortress", QuestNPC = "Marine Quest Giver", Enemy = "Marine Lieutenant", MinLevel = 120, MaxLevel = 150},
     {Level = 150, Island = "Skylands", QuestNPC = "Sky Quest Giver", Enemy = "Sky Bandit", MinLevel = 150, MaxLevel = 200},
+    {Level = 200, Island = "Prison", QuestNPC = "Prison Quest Giver", Enemy = "Prisoner", MinLevel = 200, MaxLevel = 250},
+    {Level = 250, Island = "Colosseum", QuestNPC = "Gladiator Quest Giver", Enemy = "Gladiator", MinLevel = 250, MaxLevel = 300},
+    {Level = 300, Island = "Magma Village", QuestNPC = "Magma Quest Giver", Enemy = "Magma Ninja", MinLevel = 300, MaxLevel = 375},
+    {Level = 375, Island = "Underwater City", QuestNPC = "Fishman Quest Giver", Enemy = "Fishman Warrior", MinLevel = 375, MaxLevel = 450},
+    {Level = 450, Island = "Fountain City", QuestNPC = "Cyborg Quest Giver", Enemy = "Cyborg", MinLevel = 450, MaxLevel = 700},
     {Level = 700, Island = "Kingdom of Rose", QuestNPC = "Citizen Quest Giver", Enemy = "Raider", MinLevel = 700, MaxLevel = 725},
-    {Level = 925, Island = "Graveyard", QuestNPC = "Graveyard Quest Giver", Enemy = "Zombie", MinLevel = 925, MaxLevel = 950},
-    {Level = 1000, Island = "Snow Mountain", QuestNPC = "Snow Mountain Quest Giver", Enemy = "Snowman", MinLevel = 1000, MaxLevel = 1100},
-    {Level = 1900, Island = "Floating Turtle", QuestNPC = "Turtle Quest Giver", Enemy = "Pirate Millionaire", MinLevel = 1900, MaxLevel = 1925},
-    -- Thêm các quest khác nếu cần
+    {Level = 725, Island = "Kingdom of Rose", QuestNPC = "Elite Hunter", Enemy = "Elite Pirate", MinLevel = 725, MaxLevel = 775},
+    {Level = 775, Island = "Green Zone", QuestNPC = "Flower Quest Giver", Enemy = "Marine Commodore", MinLevel = 775, MaxLevel = 850},
+    {Level = 850, Island = "Colosseum", QuestNPC = "Bartilo", Enemy = "Swan Pirate", MinLevel = 850, MaxLevel = 875},
+    {Level = 875, Island = "Graveyard", QuestNPC = "Graveyard Quest Giver", Enemy = "Zombie", MinLevel = 875, MaxLevel = 950},
+    {Level = 950, Island = "Snow Mountain", QuestNPC = "Snow Mountain Quest Giver", Enemy = "Snowman", MinLevel = 950, MaxLevel = 1000},
+    {Level = 1000, Island = "Hot and Cold", QuestNPC = "Hot Quest Giver", Enemy = "Lava Pirate", MinLevel = 1000, MaxLevel = 1100},
+    {Level = 1100, Island = "Cursed Ship", QuestNPC = "Cursed Captain Quest Giver", Enemy = "Cursed Crew", MinLevel = 1100, MaxLevel = 1250},
+    {Level = 1250, Island = "Ice Castle", QuestNPC = "Ice Castle Quest Giver", Enemy = "Arctic Warrior", MinLevel = 1250, MaxLevel = 1350},
+    {Level = 1350, Island = "Forgotten Island", QuestNPC = "Forgotten Quest Giver", Enemy = "Sea Soldier", MinLevel = 1350, MaxLevel = 1500},
+    {Level = 1500, Island = "Port Town", QuestNPC = "Port Quest Giver", Enemy = "Pirate Millionaire", MinLevel = 1500, MaxLevel = 1575},
+    {Level = 1575, Island = "Hydra Island", QuestNPC = "Hydra Quest Giver", Enemy = "Dragon Crew Warrior", MinLevel = 1575, MaxLevel = 1675},
+    {Level = 1675, Island = "Great Tree", QuestNPC = "Great Tree Quest Giver", Enemy = "Marine Rear Admiral", MinLevel = 1675, MaxLevel = 1775},
+    {Level = 1775, Island = "Floating Turtle", QuestNPC = "Turtle Quest Giver", Enemy = "Female Islander", MinLevel = 1775, MaxLevel = 2000},
+    {Level = 2000, Island = "Haunted Castle", QuestNPC = "Haunted Quest Giver", Enemy = "Reaper", MinLevel = 2000, MaxLevel = 2250},
+    {Level = 2250, Island = "Sea of Treats", QuestNPC = "Treats Quest Giver", Enemy = "Cake Guard", MinLevel = 2250, MaxLevel = 2550},
+    {Level = 2550, Island = "Sea of Treats", QuestNPC = "Cake Prince Quest Giver", Enemy = "Dough King", MinLevel = 2550, MaxLevel = 9999},
 }
 
--- Danh sách đảo để teleport
-local Islands = {
-    "First Sea", "Middle Town", "Jungle", "Pirate Village", "Desert", "Frozen Village", "Marine Fortress",
-    "Skylands", "Prison", "Colosseum", "Magma Village", "Underwater City", "Fountain City", "Second Sea",
-    "Kingdom of Rose", "Cafe", "Green Zone", "Graveyard", "Snow Mountain", "Cold Island", "Hot Island",
-    "Cursed Ship", "Ice Castle", "Forgotten Island", "Third Sea", "Port Town", "Hydra Island", "Great Tree",
-    "Floating Turtle", "Haunted Castle", "Sea of Treats"
-}
+-- Quest đặc biệt cho level 1-80 ở Skylands
+local SkylandsQuest = {Island = "Skylands", QuestNPC = "Sky Quest Giver", Enemy = "Sky Bandit"}
 
 -- Hàm lấy level hiện tại
 local function GetPlayerLevel()
     return player.Data.Level.Value
 end
 
+-- Hàm lấy giá trị stats
+local function GetStat(statName)
+    return player.Data.Stats[statName].Value
+end
+
+-- Hàm tự động join team Pirates
+local function AutoJoinTeam()
+    ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates")
+    print("[HR Kaitun] Đã tham gia team Pirates!")
+end
+
 -- Hàm chọn quest theo level
 local function ChonQuest()
     local currentLevel = GetPlayerLevel()
-    for _, quest in pairs(QuestData) do
-        if currentLevel >= quest.MinLevel and currentLevel < quest.MaxLevel then
-            return quest
+    if currentLevel < 80 then
+        return SkylandsQuest
+    else
+        for _, quest in pairs(QuestData) do
+            if currentLevel >= quest.MinLevel and currentLevel < quest.MaxLevel then
+                return quest
+            end
         end
+        return QuestData[#QuestData]
     end
-    return QuestData[1] -- Mặc định về quest đầu tiên nếu không tìm thấy
 end
 
 -- Hàm teleport đến đảo
 local function TeleportToIsland(islandName)
     local island = game.Workspace._WorldOrigin.Locations:FindFirstChild(islandName)
     if island then
-        rootPart.CFrame = island.CFrame
-        print("Đã teleport đến: " .. islandName)
+        rootPart.CFrame = island.CFrame + Vector3.new(0, 10, 0)
+        print("[HR Kaitun] Đã teleport đến: " .. islandName)
     else
-        print("Không tìm thấy đảo: " .. islandName)
+        print("[HR Kaitun] Không tìm thấy đảo: " .. islandName)
     end
 end
 
@@ -71,25 +125,253 @@ local function TimQuai(enemyName)
     return nil
 end
 
+-- Hàm tìm trái ác quỷ
+local function TimTraiAcQuy()
+    for _, fruit in pairs(game.Workspace:GetChildren()) do
+        if fruit:IsA("Tool") and fruit:FindFirstChild("Handle") then
+            return fruit
+        end
+    end
+    return nil
+end
+
+-- Hàm tự động nhặt trái ác quỷ
+local function AutoCollectFruit()
+    local fruit = TimTraiAcQuy()
+    if fruit and humanoid and rootPart then
+        humanoid:MoveTo(fruit.Handle.Position)
+        print("[HR Kaitun] Đã nhặt trái ác quỷ: " .. fruit.Name)
+    end
+end
+
+-- Hàm kiểm tra Factory
+local function CheckFactory()
+    return game.Workspace.Enemies:FindFirstChild("Factory Staff") ~= nil
+end
+
+-- Hàm đánh Factory
+local function AutoAttackFactory()
+    if CheckFactory() and humanoid and rootPart then
+        TeleportToIsland("Kingdom of Rose")
+        for _, enemy in pairs(game.Workspace.Enemies:GetChildren()) do
+            if enemy.Name == "Factory Staff" and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                humanoid:MoveTo(enemy.HumanoidRootPart.Position)
+                if (rootPart.Position - enemy.HumanoidRootPart.Position).Magnitude < 10 then
+                    enemy.HumanoidRootPart.CFrame = rootPart.CFrame * CFrame.new(0, -5, 0)
+                end
+                ActivateCombatTool()
+            end
+        end
+        print("[HR Kaitun] Đang đánh Factory!")
+    end
+end
+
+-- Hàm đánh hải tặc
+local function AutoAttackPirates()
+    if GetPlayerLevel() >= 700 then
+        TeleportToIsland("Kingdom of Rose")
+        for _, enemy in pairs(game.Workspace.Enemies:GetChildren()) do
+            if enemy.Name:match("Pirate") and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                humanoid:MoveTo(enemy.HumanoidRootPart.Position)
+                if (rootPart.Position - enemy.HumanoidRootPart.Position).Magnitude < 10 then
+                    enemy.HumanoidRootPart.CFrame = rootPart.CFrame * CFrame.new(0, -5, 0)
+                end
+                ActivateCombatTool()
+            end
+        end
+        print("[HR Kaitun] Đang đánh hải tặc ở Sea 2!")
+    end
+end
+
+-- Hàm kiếm Saber
+local function AutoGetSaber()
+    local currentLevel = GetPlayerLevel()
+    if currentLevel >= 200 and currentLevel < 775 then
+        TeleportToIsland("Kingdom of Rose")
+        local eliteHunter = game.Workspace.NPCs:FindFirstChild("Elite Hunter")
+        if eliteHunter then
+            humanoid:MoveTo(eliteHunter.HumanoidRootPart.Position)
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("EliteHunter")
+            print("[HR Kaitun] Đã nhận nhiệm vụ Elite Hunter!")
+        end
+        local elitePirate = TimQuai("Elite Pirate")
+        if elitePirate then
+            humanoid:MoveTo(elitePirate.HumanoidRootPart.Position)
+            ActivateCombatTool()
+            print("[HR Kaitun] Đang đánh Elite Pirate!")
+        end
+        local shank = game.Workspace.Enemies:FindFirstChild("Shank")
+        if shank then
+            humanoid:MoveTo(shank.HumanoidRootPart.Position)
+            ActivateCombatTool()
+            print("[HR Kaitun] Đang đánh Shank để lấy Saber!")
+        end
+    end
+end
+
+-- Hàm nhảy server (1-10 người)
+local function AutoHopServer()
+    local playerCount = #Players:GetPlayers()
+    if playerCount < 1 or playerCount > 10 then
+        print("[HR Kaitun] Nhảy server để tìm 1-10 người...")
+        TeleportService:Teleport(game.PlaceId, player)
+    else
+        print("[HR Kaitun] Server hiện tại có " .. playerCount .. " người, phù hợp!")
+    end
+end
+
+-- Hàm kiểm tra Rip Indra
+local function CheckRipIndra()
+    return game.Workspace.Enemies:FindFirstChild("rip_indra True Form") ~= nil
+end
+
+-- Hàm lấy Tushita
+local function AutoGetTushita()
+    local currentLevel = GetPlayerLevel()
+    if currentLevel >= 2000 and CheckRipIndra() then
+        TeleportToIsland("Hydra Island")
+        local ripIndra = TimQuai("rip_indra True Form")
+        if ripIndra then
+            humanoid:MoveTo(ripIndra.HumanoidRootPart.Position)
+            ActivateCombatTool()
+            print("[HR Kaitun] Đang đánh Rip Indra để mở cổng Tushita!")
+        end
+        local longma = TimQuai("Longma")
+        if longma then
+            humanoid:MoveTo(longma.HumanoidRootPart.Position)
+            ActivateCombatTool()
+            print("[HR Kaitun] Đang đánh Longma để lấy Tushita!")
+        end
+    end
+end
+
+-- Hàm đánh Dough King
+local function AutoAttackDoughKing()
+    local currentLevel = GetPlayerLevel()
+    if currentLevel >= 2550 then
+        TeleportToIsland("Sea of Treats")
+        local doughKing = TimQuai("Dough King")
+        if doughKing then
+            humanoid:MoveTo(doughKing.HumanoidRootPart.Position)
+            if (rootPart.Position - doughKing.HumanoidRootPart.Position).Magnitude < 10 then
+                doughKing.HumanoidRootPart.CFrame = rootPart.CFrame * CFrame.new(0, -5, 0)
+            end
+            ActivateCombatTool()
+            print("[HR Kaitun] Đang đánh Dough King!")
+        else
+            local cakePrince = TimQuai("Cake Prince")
+            if cakePrince then
+                humanoid:MoveTo(cakePrince.HumanoidRootPart.Position)
+                ActivateCombatTool()
+                print("[HR Kaitun] Đang đánh Cake Prince để spawn Dough King!")
+            end
+        end
+    end
+end
+
+-- Hàm farm Elite để lấy Yama
+local function AutoGetYama()
+    local currentLevel = GetPlayerLevel()
+    if currentLevel >= 1500 then
+        TeleportToIsland("Hydra Island")
+        local eliteHunter = game.Workspace.NPCs:FindFirstChild("Elite Hunter")
+        if eliteHunter then
+            humanoid:MoveTo(eliteHunter.HumanoidRootPart.Position)
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("EliteHunter")
+            print("[HR Kaitun] Đã nhận nhiệm vụ Elite Hunter để lấy Yama!")
+        end
+        local elitePirate = TimQuai("Elite Pirate")
+        if elitePirate then
+            humanoid:MoveTo(elitePirate.HumanoidRootPart.Position)
+            ActivateCombatTool()
+            print("[HR Kaitun] Đang đánh Elite Pirate để farm Yama!")
+        end
+    end
+end
+
+-- Hàm tự động cộng stats kiểu Kaitun
+local function AutoAddStats()
+    local currentLevel = GetPlayerLevel()
+    local melee = GetStat("Melee")
+    local defense = GetStat("Defense")
+    local sword = GetStat("Sword")
+    local maxStat = 2550
+
+    if tick() - lastStatTime > 1 then
+        if melee < maxStat then
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("AddPoint", "Melee", 1)
+            print("[HR Kaitun] Đã cộng 1 điểm vào Melee!")
+        elseif defense < maxStat then
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("AddPoint", "Defense", 1)
+            print("[HR Kaitun] Đã cộng 1 điểm vào Defense!")
+        elseif sword < maxStat then
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("AddPoint", "Sword", 1)
+            print("[HR Kaitun] Đã cộng 1 điểm vào Sword!")
+        end
+        lastStatTime = tick()
+    end
+end
+
+-- Hàm làm nhiệm vụ Bartilo
+local function AutoBartiloQuest()
+    local currentLevel = GetPlayerLevel()
+    if currentLevel >= 850 and currentLevel < 875 then
+        TeleportToIsland("Colosseum")
+        local bartilo = game.Workspace.NPCs:FindFirstChild("Bartilo")
+        if bartilo then
+            humanoid:MoveTo(bartilo.HumanoidRootPart.Position)
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("BartiloQuest", 1)
+            print("[HR Kaitun] Đã nhận nhiệm vụ Bartilo!")
+        end
+        local swanPirate = TimQuai("Swan Pirate")
+        if swanPirate then
+            humanoid:MoveTo(swanPirate.HumanoidRootPart.Position)
+            ActivateCombatTool()
+            print("[HR Kaitun] Đang đánh Swan Pirate cho Bartilo Quest!")
+        end
+    end
+end
+
+-- Hàm kích hoạt công cụ combat
+local function ActivateCombatTool()
+    local tool = character:FindFirstChildOfClass("Tool")
+    if not tool then
+        for _, item in pairs(player.Backpack:GetChildren()) do
+            if item:IsA("Tool") then
+                item.Parent = character
+                tool = item
+                break
+            end
+        end
+    end
+    if tool then
+        tool:Activate()
+    end
+end
+
 -- Hàm farm quái
 local function FarmQuai(quest)
     local enemy = TimQuai(quest.Enemy)
     if enemy and humanoid and rootPart then
+        humanoid.WalkSpeed = 50
         humanoid:MoveTo(enemy.HumanoidRootPart.Position)
-        VirtualUser:Click()
         if (rootPart.Position - enemy.HumanoidRootPart.Position).Magnitude < 10 then
-            enemy.HumanoidRootPart.CFrame = rootPart.CFrame * CFrame.new(0, -5, 0) -- Kéo quái lại gần
+            enemy.HumanoidRootPart.CFrame = rootPart.CFrame * CFrame.new(0, -5, 0)
         end
+        ActivateCombatTool()
     end
 end
 
 -- Hàm tự động làm quest
 local function AutoQuest(quest)
     local npc = game.Workspace.NPCs:FindFirstChild(quest.QuestNPC)
-    if npc and (rootPart.Position - npc.HumanoidRootPart.Position).Magnitude > 10 then
-        humanoid:MoveTo(npc.HumanoidRootPart.Position)
-    else
-        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("StartQuest", quest.QuestNPC, 1)
+    if npc then
+        if (rootPart.Position - npc.HumanoidRootPart.Position).Magnitude > 10 then
+            humanoid:MoveTo(npc.HumanoidRootPart.Position)
+        else
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", quest.QuestNPC, 1)
+            print("[HR Kaitun] Đã nhận quest từ: " .. quest.QuestNPC)
+        end
     end
 end
 
@@ -98,10 +380,36 @@ local function AutoFarmLevel()
     if not farmEnabled or not humanoid or not rootPart then return end
     
     local quest = ChonQuest()
-    TeleportToIsland(quest.Island) -- Teleport đến đảo của quest
-    AutoQuest(quest) -- Làm quest
-    FarmQuai(quest) -- Farm quái
+    TeleportToIsland(quest.Island)
+    AutoQuest(quest)
+    FarmQuai(quest)
+    AutoAddStats()
+    AutoCollectFruit()
+    AutoAttackFactory()
+    AutoAttackPirates()
+    AutoGetSaber()
+    AutoHopServer()
+    AutoGetTushita()
+    AutoAttackDoughKing()
+    AutoGetYama()
+    AutoBartiloQuest()
 end
+
+-- Xử lý nút đóng/mở và phát nhạc
+ToggleButton.MouseButton1Click:Connect(function()
+    farmEnabled = not farmEnabled
+    if farmEnabled then
+        StatusLabel.Text = "HR Kaitun: ON"
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        print("[HR Kaitun] Đã bật auto farm!")
+        Music:Play() -- Phát nhạc khi bật script
+    else
+        StatusLabel.Text = "HR Kaitun: OFF"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+        print("[HR Kaitun] Đã tắt auto farm!")
+        Music:Stop() -- Dừng nhạc khi tắt script
+    end
+end)
 
 -- Khởi động script
 local function KhoiDong()
@@ -110,8 +418,9 @@ local function KhoiDong()
     humanoid = character:WaitForChild("Humanoid")
     rootPart = character:WaitForChild("HumanoidRootPart")
     
-    farmEnabled = true
-    print("Auto Farm Level Blox Fruits (Xero Kaitun style) đã khởi động!")
+    AutoJoinTeam()
+    print("[HR Kaitun] Auto Farm Level Blox Fruits đã khởi động!")
+    print("[HR Kaitun] Nhấn vào nút để bật/tắt auto farm và phát nhạc!")
 end
 
 -- Kết nối sự kiện
@@ -124,8 +433,10 @@ if player and player.Character then
 end
 
 -- Vòng lặp chính
+local lastFarmTime = 0
 RunService.Heartbeat:Connect(function()
-    if farmEnabled then
+    if farmEnabled and tick() - lastFarmTime > 0.5 then
         AutoFarmLevel()
+        lastFarmTime = tick()
     end
 end)
