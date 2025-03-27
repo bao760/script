@@ -1,0 +1,131 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+
+-- Biến lưu trữ
+local player = Players.LocalPlayer
+local character = nil
+local humanoid = nil
+local rootPart = nil
+local farmEnabled = false
+
+-- Danh sách đảo và quest theo level
+local QuestData = {
+    {Level = 0, Island = "First Sea", QuestNPC = "Bandit Quest Giver", Enemy = "Bandit", MinLevel = 0, MaxLevel = 10},
+    {Level = 10, Island = "Jungle", QuestNPC = "Monkey Quest Giver", Enemy = "Monkey", MinLevel = 10, MaxLevel = 30},
+    {Level = 30, Island = "Pirate Village", QuestNPC = "Pirate Quest Giver", Enemy = "Pirate", MinLevel = 30, MaxLevel = 60},
+    {Level = 60, Island = "Desert", QuestNPC = "Desert Bandit Quest Giver", Enemy = "Desert Bandit", MinLevel = 60, MaxLevel = 90},
+    {Level = 90, Island = "Frozen Village", QuestNPC = "Snow Quest Giver", Enemy = "Snow Bandit", MinLevel = 90, MaxLevel = 120},
+    {Level = 120, Island = "Marine Fortress", QuestNPC = "Marine Quest Giver", Enemy = "Marine", MinLevel = 120, MaxLevel = 150},
+    {Level = 150, Island = "Skylands", QuestNPC = "Sky Quest Giver", Enemy = "Sky Bandit", MinLevel = 150, MaxLevel = 200},
+    {Level = 700, Island = "Kingdom of Rose", QuestNPC = "Citizen Quest Giver", Enemy = "Raider", MinLevel = 700, MaxLevel = 725},
+    {Level = 925, Island = "Graveyard", QuestNPC = "Graveyard Quest Giver", Enemy = "Zombie", MinLevel = 925, MaxLevel = 950},
+    {Level = 1000, Island = "Snow Mountain", QuestNPC = "Snow Mountain Quest Giver", Enemy = "Snowman", MinLevel = 1000, MaxLevel = 1100},
+    {Level = 1900, Island = "Floating Turtle", QuestNPC = "Turtle Quest Giver", Enemy = "Pirate Millionaire", MinLevel = 1900, MaxLevel = 1925},
+    -- Thêm các quest khác nếu cần
+}
+
+-- Danh sách đảo để teleport
+local Islands = {
+    "First Sea", "Middle Town", "Jungle", "Pirate Village", "Desert", "Frozen Village", "Marine Fortress",
+    "Skylands", "Prison", "Colosseum", "Magma Village", "Underwater City", "Fountain City", "Second Sea",
+    "Kingdom of Rose", "Cafe", "Green Zone", "Graveyard", "Snow Mountain", "Cold Island", "Hot Island",
+    "Cursed Ship", "Ice Castle", "Forgotten Island", "Third Sea", "Port Town", "Hydra Island", "Great Tree",
+    "Floating Turtle", "Haunted Castle", "Sea of Treats"
+}
+
+-- Hàm lấy level hiện tại
+local function GetPlayerLevel()
+    return player.Data.Level.Value
+end
+
+-- Hàm chọn quest theo level
+local function ChonQuest()
+    local currentLevel = GetPlayerLevel()
+    for _, quest in pairs(QuestData) do
+        if currentLevel >= quest.MinLevel and currentLevel < quest.MaxLevel then
+            return quest
+        end
+    end
+    return QuestData[1] -- Mặc định về quest đầu tiên nếu không tìm thấy
+end
+
+-- Hàm teleport đến đảo
+local function TeleportToIsland(islandName)
+    local island = game.Workspace._WorldOrigin.Locations:FindFirstChild(islandName)
+    if island then
+        rootPart.CFrame = island.CFrame
+        print("Đã teleport đến: " .. islandName)
+    else
+        print("Không tìm thấy đảo: " .. islandName)
+    end
+end
+
+-- Hàm tìm quái theo tên
+local function TimQuai(enemyName)
+    for _, enemy in pairs(game.Workspace.Enemies:GetChildren()) do
+        if enemy.Name == enemyName and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+            return enemy
+        end
+    end
+    return nil
+end
+
+-- Hàm farm quái
+local function FarmQuai(quest)
+    local enemy = TimQuai(quest.Enemy)
+    if enemy and humanoid and rootPart then
+        humanoid:MoveTo(enemy.HumanoidRootPart.Position)
+        VirtualUser:Click()
+        if (rootPart.Position - enemy.HumanoidRootPart.Position).Magnitude < 10 then
+            enemy.HumanoidRootPart.CFrame = rootPart.CFrame * CFrame.new(0, -5, 0) -- Kéo quái lại gần
+        end
+    end
+end
+
+-- Hàm tự động làm quest
+local function AutoQuest(quest)
+    local npc = game.Workspace.NPCs:FindFirstChild(quest.QuestNPC)
+    if npc and (rootPart.Position - npc.HumanoidRootPart.Position).Magnitude > 10 then
+        humanoid:MoveTo(npc.HumanoidRootPart.Position)
+    else
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("StartQuest", quest.QuestNPC, 1)
+    end
+end
+
+-- Hàm chính auto farm level
+local function AutoFarmLevel()
+    if not farmEnabled or not humanoid or not rootPart then return end
+    
+    local quest = ChonQuest()
+    TeleportToIsland(quest.Island) -- Teleport đến đảo của quest
+    AutoQuest(quest) -- Làm quest
+    FarmQuai(quest) -- Farm quái
+end
+
+-- Khởi động script
+local function KhoiDong()
+    player = Players.LocalPlayer
+    character = player.Character or player.CharacterAdded:Wait()
+    humanoid = character:WaitForChild("Humanoid")
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    
+    farmEnabled = true
+    print("Auto Farm Level Blox Fruits (Xero Kaitun style) đã khởi động!")
+end
+
+-- Kết nối sự kiện
+Players.PlayerAdded:Connect(function(newPlayer)
+    newPlayer.CharacterAdded:Connect(KhoiDong)
+end)
+
+if player and player.Character then
+    KhoiDong()
+end
+
+-- Vòng lặp chính
+RunService.Heartbeat:Connect(function()
+    if farmEnabled then
+        AutoFarmLevel()
+    end
+end)
