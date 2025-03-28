@@ -1,0 +1,224 @@
+-- Script Auto Farm Full Chức Năng cho RoNix
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+local mouse = player:GetMouse()
+
+-- Danh sách đảo (thay đổi tọa độ thực tế)
+local islands = {
+    {name = "Island1", position = Vector3.new(100, 10, 100)},
+    {name = "Island2", position = Vector3.new(200, 10, 200)},
+    {name = "Island3", position = Vector3.new(300, 10, 300)},
+    {name = "Island4", position = Vector3.new(400, 10, 400)},
+}
+
+-- Danh sách chế độ farm
+local farmModes = {"Single Island", "All Islands"}
+
+-- Biến trạng thái
+local selectedIsland = nil
+local selectedMode = nil
+local isFarming = false
+local capturedMobs = {}
+
+-- Tạo GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+ScreenGui.Name = "FarmMenu"
+ScreenGui.ResetOnSpawn = false -- Đảm bảo GUI không reset khi chết
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 300, 0, 400)
+Frame.Position = UDim2.new(0.5, -150, 0.5, -200)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Title.Text = "Auto Farm Menu"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 24
+Title.Font = Enum.Font.SourceSansBold
+Title.Parent = Frame
+
+-- Hàm tạo nút
+local function createButton(name, position, size, callback)
+    local Button = Instance.new("TextButton")
+    Button.Size = size
+    Button.Position = position
+    Button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.TextSize = 18
+    Button.Font = Enum.Font.SourceSans
+    Button.Text = name
+    Button.Parent = Frame
+    Button.MouseButton1Click:Connect(callback)
+    Button.MouseEnter:Connect(function()
+        Button.BackgroundColor3 = Color3.fromRGB(100, 100, 100) -- Hover effect
+    end)
+    Button.MouseLeave:Connect(function()
+        Button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    end)
+    return Button
+end
+
+-- Tạo danh sách đảo
+local islandButtons = {}
+for i, island in pairs(islands) do
+    islandButtons[i] = createButton(island.name, UDim2.new(0, 10, 0, 60 + (i-1)*40), UDim2.new(0, 130, 0, 30), function()
+        selectedIsland = island
+        for j, btn in pairs(islandButtons) do
+            btn.BackgroundColor3 = (j == i and Color3.fromRGB(0, 120, 0)) or Color3.fromRGB(70, 70, 70)
+        end
+        print("Đã chọn: " .. island.name)
+    end)
+end
+
+-- Tạo danh sách mode
+local modeButtons = {}
+for i, mode in pairs(farmModes) do
+    modeButtons[i] = createButton(mode, UDim2.new(0, 160, 0, 60 + (i-1)*40), UDim2.new(0, 130, 0, 30), function()
+        selectedMode = mode
+        for j, btn in pairs(modeButtons) do
+            btn.BackgroundColor3 = (j == i and Color3.fromRGB(0, 120, 0)) or Color3.fromRGB(70, 70, 70)
+        end
+        print("Đã chọn mode: " .. mode)
+    end)
+end
+
+-- Nút Start/Stop
+local startStopButton = createButton("Start", UDim2.new(0, 10, 0, 350), UDim2.new(0, 280, 0, 40), function()
+    if isFarming then
+        isFarming = false
+        startStopButton.Text = "Start"
+        startStopButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        print("Đã dừng farm!")
+    else
+        if selectedIsland and selectedMode then
+            isFarming = true
+            startStopButton.Text = "Stop"
+            startStopButton.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+            print("Bắt đầu farm!")
+            spawn(startFarming)
+        else
+            print("Vui lòng chọn đảo và mode trước!")
+        end
+    end
+end)
+
+-- Hàm Auto Click (5 đòn/giây)
+local function autoClick()
+    while isFarming do
+        for i = 1, 5 do
+            if not isFarming then break end
+            local tool = character:FindFirstChildOfClass("Tool")
+            if tool and tool:FindFirstChild("Handle") then
+                tool:Activate()
+            else
+                game:GetService("VirtualUser"):ClickButton1(Vector2.new(mouse.X, mouse.Y))
+            end
+            wait(0.2)
+        end
+    end
+end
+
+-- Hàm thu phục quái
+local function captureMob(mob)
+    local mobName = mob.Name
+    capturedMobs[mobName] = capturedMobs[mobName] or 0
+    if capturedMobs[mobName] < 4 then
+        -- Giả định RemoteEvent (thay bằng thực tế)
+        local success = pcall(function()
+            -- Ví dụ: game.ReplicatedStorage.CaptureMob:FireServer(mob)
+            return true
+        end)
+        if success then
+            capturedMobs[mobName] = capturedMobs[mobName] + 1
+            print("Đã thu phục " .. mobName .. " (" .. capturedMobs[mobName] .. "/4)")
+        end
+    end
+end
+
+-- Hàm farm mobs
+local function farmMobs()
+    for _, mob in pairs(game.Workspace:GetChildren()) do
+        if not isFarming then break end
+        if mob:FindFirstChild("Humanoid") and mob ~= character then
+            local mobHumanoid = mob:FindFirstChild("Humanoid")
+            local mobRootPart = mob:FindFirstChild("HumanoidRootPart")
+            if mobHumanoid and mobRootPart and mobHumanoid.Health > 0 then
+                local distance = (humanoidRootPart.Position - mobRootPart.Position).Magnitude
+                if distance <= 50 then
+                    humanoid:MoveTo(mobRootPart.Position)
+                    wait(2)
+                    local startTime = tick()
+                    while mobHumanoid.Health > 0 and (tick() - startTime) < 5 and isFarming do
+                        wait(0.1)
+                    end
+                    if mobHumanoid.Health <= 0 then
+                        captureMob(mob)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Hàm trang bị con mạnh nhất
+local function equipStrongest()
+    local strongestMob = nil
+    local highestPower = 0
+    for mobName, count in pairs(capturedMobs) do
+        if count >= 4 then
+            local power = math.random(100, 1000) -- Thay bằng chỉ số thực tế
+            if power > highestPower then
+                highestPower = power
+                strongestMob = mobName
+            end
+        end
+    end
+    if strongestMob then
+        pcall(function()
+            -- Giả định RemoteEvent (thay bằng thực tế)
+            -- game.ReplicatedStorage.EquipMob:FireServer(strongestMob)
+            print("Trang bị: " .. strongestMob .. " (Sức mạnh: " .. highestPower .. ")")
+        end)
+    end
+end
+
+-- Hàm chạy farm
+function startFarming()
+    spawn(autoClick)
+    if selectedMode == "Single Island" then
+        while isFarming do
+            humanoidRootPart.CFrame = CFrame.new(selectedIsland.position)
+            wait(2)
+            farmMobs()
+            equipStrongest()
+            wait(5)
+        end
+    elseif selectedMode == "All Islands" then
+        while isFarming do
+            for _, island in pairs(islands) do
+                if not isFarming then break end
+                humanoidRootPart.CFrame = CFrame.new(island.position)
+                wait(2)
+                farmMobs()
+                equipStrongest()
+                wait(5)
+            end
+        end
+    end
+end
+
+-- Kiểm tra khi nhân vật reset
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    humanoid = character:WaitForChild("Humanoid")
+end)
+
+print("Menu Auto Farm Full Chức Năng cho RoNix đã sẵn sàng!")
